@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executive BI Analytics</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS (XLSX) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- jsPDF & AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-200 font-sans custom-scrollbar">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-brand-600 text-white p-2 rounded-lg shadow-md">
+                    <i class="fa-solid fa-chart-line text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-none tracking-tight">Executive BI Analytics</h1>
+                    <span id="fileNameDisplay" class="text-xs text-slate-500 dark:text-slate-400">Nenhum arquivo carregado</span>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <!-- Tab Selector for Sheets -->
+                <div id="sheetSelectorContainer" class="hidden flex items-center bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
+                    <i class="fa-solid fa-layer-group text-slate-400 ml-2 mr-1 text-xs"></i>
+                    <select id="sheetSelector" class="bg-transparent text-xs font-semibold focus:outline-none pr-2 py-1 border-none rounded cursor-pointer"></select>
+                </div>
+
+                <!-- Export Buttons -->
+                <button id="btnExportExcel" onclick="exportExcel()" disabled class="opacity-50 cursor-not-allowed bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1.5 transition">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span class="hidden sm:inline">Excel</span>
+                </button>
+                <button id="btnExportPDF" onclick="exportPDF()" disabled class="opacity-50 cursor-not-allowed bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1.5 transition">
+                    <i class="fa-solid fa-file-pdf"></i>
+                    <span class="hidden sm:inline">PDF</span>
+                </button>
+
+                <!-- Dark Mode Toggle -->
+                <button id="themeToggleBtn" onclick="toggleTheme()" class="p-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+                    <i id="themeToggleIcon" class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- File Upload Area -->
+        <div id="uploadContainer" class="bg-white dark:bg-slate-800 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 p-8 text-center hover:border-brand-500 dark:hover:border-brand-500 transition cursor-pointer shadow-sm relative group">
+            <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleFileSelect(event)">
+            <div class="flex flex-col items-center justify-center space-y-3">
+                <div class="w-16 h-16 bg-brand-50 dark:bg-slate-700 text-brand-600 dark:text-brand-500 rounded-full flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                </div>
+                <div>
+                    <p class="text-base font-semibold text-slate-700 dark:text-slate-200">Arraste e solte sua planilha ou clique para selecionar</p>
+                    <p class="text-xs text-slate-400 mt-1">Suporta arquivos .xlsx, .xls e .csv</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Workspace (Hidden until file load) -->
+        <div id="dashboardContent" class="hidden space-y-6">
+
+            <!-- Global Controls Toolbar -->
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+                <!-- Search -->
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="searchInput" placeholder="Buscar em qualquer coluna..." oninput="applyFilters()" class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:border-brand-500">
+                </div>
+
+                <!-- Primary Metric Selector -->
+                <div class="flex items-center space-x-2">
+                    <label class="text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">Métrica Principal:</label>
+                    <select id="metricSelector" onchange="handleMetricChange()" class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:border-brand-500"></select>
+                </div>
+
+                <!-- Clear Filters -->
+                <button onclick="clearFilters()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg text-xs font-semibold transition text-slate-600 dark:text-slate-300 flex items-center justify-center space-x-1">
+                    <i class="fa-solid fa-filter-circle-xmark"></i>
+                    <span>Limpar Filtros</span>
+                </button>
+            </div>
+
+            <!-- Dynamic Category Filters Bar -->
+            <div id="filtersContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4"></div>
+
+            <!-- KPI Cards Grid -->
+            <div id="kpiContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+
+            <!-- Temporal Analysis & Period Comparison -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Temporal Evolution Chart -->
+                <div class="lg:col-span-2 bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 dark:border-slate-700/50 pb-3">
+                        <h2 id="temporalChartTitle" class="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-brand-500"></i>
+                            Análise Temporal
+                        </h2>
+                        <div id="temporalControls" class="flex items-center space-x-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg text-xs">
+                            <button onclick="setTemporalGroup('day')" id="btnGrpDay" class="px-2.5 py-1 rounded font-medium transition">Dia</button>
+                            <button onclick="setTemporalGroup('month')" id="btnGrpMonth" class="px-2.5 py-1 rounded font-medium transition bg-white dark:bg-slate-700 shadow-sm text-brand-600 dark:text-brand-400">Mês</button>
+                            <button onclick="setTemporalGroup('quarter')" id="btnGrpQuarter" class="px-2.5 py-1 rounded font-medium transition">Trimestre</button>
+                            <button onclick="setTemporalGroup('year')" id="btnGrpYear" class="px-2.5 py-1 rounded font-medium transition">Ano</button>
+                        </div>
+                    </div>
+                    <div class="relative h-64 w-full flex items-center justify-center">
+                        <canvas id="temporalChart"></canvas>
+                        <div id="temporalChartFallback" class="hidden text-center text-slate-400 text-xs">
+                            <i class="fa-solid fa-calendar-xmark text-2xl mb-2 block"></i>
+                            <span>Nenhuma coluna de data disponível</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Comparative Period Card -->
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <div class="border-b border-slate-100 dark:border-slate-700/50 pb-3 mb-4">
+                            <h2 class="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-code-compare text-brand-500"></i>
+                                Comparativo de Períodos
+                            </h2>
+                        </div>
+                        <div id="comparisonContent" class="space-y-4">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                    <div id="comparisonFooter" class="text-xs text-slate-400 pt-4 border-t border-slate-100 dark:border-slate-700/50">
+                        Comparando o último período com o imediatamente anterior.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rankings & Category Distribution -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Dimension Ranking -->
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 dark:border-slate-700/50 pb-3">
+                        <h2 class="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-ranking-star text-amber-500"></i>
+                            Ranking por Dimensão
+                        </h2>
+                        <div class="flex items-center space-x-2">
+                            <select id="rankingDimensionSelector" onchange="renderRanking()" class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-xs px-2 py-1 font-medium"></select>
+                            <select id="rankingLimitSelector" onchange="renderRanking()" class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-xs px-2 py-1 font-medium">
+                                <option value="5">Top 5</option>
+                                <option value="10" selected>Top 10</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="rankingList" class="space-y-3"></div>
+                </div>
+
+                <!-- Pivot Summary Table -->
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 dark:border-slate-700/50 pb-3">
+                            <h2 class="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-table-cells text-indigo-500"></i>
+                                Resumo Agrupado (Tabela Dinâmica)
+                            </h2>
+                            <select id="pivotDimensionSelector" onchange="renderPivotTable()" class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded text-xs px-2 py-1 font-medium"></select>
+                        </div>
+                        <div class="overflow-x-auto custom-scrollbar mt-3">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="border-b border-slate-200 dark:border-slate-700 text-slate-400">
+                                        <th class="py-2 px-3 font-semibold">Categoria</th>
+                                        <th class="py-2 px-3 font-semibold text-right">Registros</th>
+                                        <th class="py-2 px-3 font-semibold text-right">Soma</th>
+                                        <th class="py-2 px-3 font-semibold text-right">Média</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pivotTableBody" class="divide-y divide-slate-100 dark:divide-slate-700/50"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Data Table -->
+            <div class="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 dark:border-slate-700/50 pb-3">
+                    <h2 class="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-table text-emerald-500"></i>
+                        Tabela de Dados Reais
+                    </h2>
+                    <span id="tableRecordCount" class="text-xs text-slate-400">0 registros exibidos</span>
+                </div>
+                <div class="overflow-x-auto custom-scrollbar rounded-lg border border-slate-200 dark:border-slate-700">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead id="dataTableHead" class="bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-700"></thead>
+                        <tbody id="dataTableBody" class="divide-y divide-slate-100 dark:divide-slate-700/50 text-slate-700 dark:text-slate-300"></tbody>
+                    </table>
+                </div>
+                <!-- Pagination -->
+                <div class="flex flex-col sm:flex-row justify-between items-center gap-3 pt-2 text-xs">
+                    <div class="flex items-center space-x-2">
+                        <span>Exibir</span>
+                        <select id="pageSizeSelector" onchange="changePageSize()" class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-2 py-1">
+                            <option value="10">10</option>
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                        <span>por página</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="changePage(-1)" id="btnPrevPage" class="px-3 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded disabled:opacity-40 disabled:cursor-not-allowed">Anterior</button>
+                        <span id="pageIndicator" class="font-medium">Página 1 de 1</span>
+                        <button onclick="changePage(1)" id="btnNextPage" class="px-3 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded disabled:opacity-40 disabled:cursor-not-allowed">Próxima</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Structure Diagnostics Section -->
+            <div class="bg-slate-100 dark:bg-slate-800/60 p-5 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                <h2 class="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                    <i class="fa-solid fa-microscope"></i>
+                    Diagnóstico da Estrutura
+                </h2>
+                <div id="diagnosticContent" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs"></div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // Global Application State
+        let rawWorkbook = null;
+        let currentSheetName = '';
+        let fullData = [];           // Array of parsed row objects
+        let activeHeaders = [];       // Real validated column headers
+        let filteredData = [];       // Filtered dataset
+        
+        // Metadata & Column Types
+        let columnTypes = {
+            numeric: [],
+            date: [],
+            categorical: []
+        };
+        
+        let primaryMetric = null;
+        let primaryDateCol = null;
+        let currentTemporalGroup = 'month'; // 'day', 'month', 'quarter', 'year'
+        
+        // Pagination & Filters State
+        let currentPage = 1;
+        let pageSize = 25;
+        let activeFilters = {};
+        let chartInstance = null;
+
+        // Initialize Theme & Settings
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('bi_theme');
+            if (savedTheme === 'light') {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('themeToggleIcon').className = 'fa-solid fa-sun';
+            } else {
+                document.documentElement.classList.add('dark');
+                document.getElementById('themeToggleIcon').className = 'fa-solid fa-moon';
+            }
+        });
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('bi_theme', isDark ? 'dark' : 'light');
+            document.getElementById('themeToggleIcon').className = isDark ? 'fa-solid fa-moon' : 'fa-solid fa-sun';
+            if (chartInstance) updateChartColors();
+        }
+
+        // File Handler
+        function handleFileSelect(evt) {
+            const file = evt.target.files[0];
+            if (!file) return;
+
+            document.getElementById('fileNameDisplay').textContent = file.name;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                rawWorkbook = XLSX.read(data, { type: 'array', cellDates: false });
+
+                // Setup Sheet Selector
+                const sheetSelector = document.getElementById('sheetSelector');
+                sheetSelector.innerHTML = '';
+                rawWorkbook.SheetNames.forEach(name => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    sheetSelector.appendChild(opt);
+                });
+
+                if (rawWorkbook.SheetNames.length > 1) {
+                    document.getElementById('sheetSelectorContainer').classList.remove('hidden');
+                } else {
+                    document.getElementById('sheetSelectorContainer').classList.add('hidden');
+                }
+
+                sheetSelector.onchange = (e) => loadSheet(e.target.value);
+                loadSheet(rawWorkbook.SheetNames[0]);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Main Sheet Processing & Intelligence Logic
+        function loadSheet(sheetName) {
+            currentSheetName = sheetName;
+            const worksheet = rawWorkbook.Sheets[sheetName];
+            const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
+
+            if (!rawRows || rawRows.length === 0) {
+                alert('A aba selecionada está vazia.');
+                return;
+            }
+
+            // 1. Identify Real Header Row dynamically
+            let headerRowIndex = -1;
+            let maxScore = -1;
+
+            for (let i = 0; i < Math.min(20, rawRows.length); i++) {
+                const row = rawRows[i];
+                if (!Array.isArray(row)) continue;
+
+                let nonNullCount = 0;
+                let textScore = 0;
+                let keywordScore = 0;
+
+                row.forEach(cell => {
+                    if (cell !== null && cell !== undefined && String(cell).trim() !== '') {
+                        nonNullCount++;
+                        const str = String(cell).toUpperCase().trim();
+                        if (isNaN(cell)) textScore++;
+                        if (/DATA|DT_|EMISSAO|VALOR|VAL_|RECEITA|TOTAL|CLIENTE|PRODUTO|STATUS|DOCUMENTO|NOTA|VENCIMENTO|PERIODO|MES|ANO|UF|CIDADE/i.test(str)) {
+                            keywordScore += 2;
+                        }
+                    }
+                });
+
+                const totalScore = (nonNullCount * 2) + textScore + keywordScore;
+                if (totalScore > maxScore && nonNullCount > 0) {
+                    maxScore = totalScore;
+                    headerRowIndex = i;
+                }
+            }
+
+            if (headerRowIndex === -1) {
+                alert('Não foi possível identificar uma estrutura de dados válida.');
+                return;
+            }
+
+            // 2. Process Headers & Eliminate __EMPTY
+            const rawHeaderRow = rawRows[headerRowIndex];
+            activeHeaders = [];
+            const headerCounts = {};
+
+            rawHeaderRow.forEach((col, idx) => {
+                let name = col !== null && col !== undefined ? String(col).trim() : '';
+                
+                // Strictly ignore __EMPTY patterns
+                if (!name || /^__EMPTY/i.test(name)) {
+                    name = null; 
+                }
+
+                if (name) {
+                    // Handle duplicates safely without generating __EMPTY
+                    if (headerCounts[name]) {
+                        headerCounts[name]++;
+                        name = `${name} ${headerCounts[name]}`;
+                    } else {
+                        headerCounts[name] = 1;
+                    }
+                    activeHeaders.push({ originalIdx: idx, name: name });
+                }
+            });
+
+            if (activeHeaders.length === 0) {
+                alert('Nenhum cabeçalho válido foi encontrado.');
+                return;
+            }
+
+            // 3. Extract and Clean Data Rows
+            fullData = [];
+            for (let i = headerRowIndex + 1; i < rawRows.length; i++) {
+                const row = rawRows[i];
+                if (!row) continue;
+
+                let rowObj = {};
+                let hasData = false;
+
+                activeHeaders.forEach(h => {
+                    const val = row[h.originalIdx];
+                    if (val !== undefined && val !== null && String(val).trim() !== '') {
+                        hasData = true;
+                        rowObj[h.name] = val;
+                    } else {
+                        rowObj[h.name] = null;
+                    }
+                });
+
+                if (hasData) {
+                    fullData.push(rowObj);
+                }
+            }
+
+            // 4. Advanced Column Classification (Strict Rules)
+            classifyColumns();
+
+            // 5. Reset UI & Render
+            activeFilters = {};
+            document.getElementById('searchInput').value = '';
+            document.getElementById('dashboardContent').classList.remove('hidden');
+            document.getElementById('btnExportExcel').disabled = false;
+            document.getElementById('btnExportExcel').classList.remove('opacity-50', 'cursor-not-allowed');
+            document.getElementById('btnExportPDF').disabled = false;
+            document.getElementById('btnExportPDF').classList.remove('opacity-50', 'cursor-not-allowed');
+
+            setupControls();
+            applyFilters();
+        }
+
+        // Strict Classification of Dates, Numbers, and Categories
+        function classifyColumns() {
+            columnTypes = { numeric: [], date: [], categorical: [] };
+
+            const dateHeaderRegex = /^(DATA|DT_|DATA_|DT_EMISSAO|DATA_EMISSAO|DT_ENTREGA|DATA_ENTREGA|VENCIMENTO|DT_VENCIMENTO|PERIODO|MES|ANO)/i;
+            const metricHeaderRegex = /(VALOR|VAL_|RECEITA|FATURAMENTO|TOTAL|QUANTIDADE|VOLUME|PRECO|CUSTO|LUCRO|DIAS)/i;
+
+            activeHeaders.forEach(h => {
+                const col = h.name;
+                let dateMatches = 0;
+                let numberMatches = 0;
+                let totalValid = 0;
+
+                fullData.forEach(row => {
+                    const val = row[col];
+                    if (val === null || val === undefined) return;
+                    totalValid++;
+
+                    // Check for Date formats
+                    if (isStrictDateValue(val, col, dateHeaderRegex)) {
+                        dateMatches++;
+                    }
+
+                    // Check for Numeric formats
+                    let numVal = parseNumeric(val);
+                    if (numVal !== null && !isNaN(numVal)) {
+                        numberMatches++;
+                    }
+                });
+
+                const dateRatio = totalValid > 0 ? dateMatches / totalValid : 0;
+                const numberRatio = totalValid > 0 ? numberMatches / totalValid : 0;
+
+                // STRICT DATE REQUIREMENT: Header must align or very high ratio of explicit date string
+                if (dateHeaderRegex.test(col) || (dateRatio > 0.7 && !metricHeaderRegex.test(col))) {
+                    columnTypes.date.push(col);
+                } else if (numberRatio > 0.8 && !dateHeaderRegex.test(col)) {
+                    columnTypes.numeric.push(col);
+                } else {
+                    columnTypes.categorical.push(col);
+                }
+            });
+
+            // Select Primary Metric
+            primaryMetric = columnTypes.numeric.find(c => metricHeaderRegex.test(c)) || columnTypes.numeric[0] || null;
+
+            // Select Primary Date Column
+            primaryDateCol = columnTypes.date[0] || null;
+        }
+
+        // Helper: Strict Date Checker (Prevents converting serials like 63, 100 into dates)
+        function isStrictDateValue(val, colName, dateHeaderRegex) {
+            if (val instanceof Date) return true;
+
+            const strVal = String(val).trim();
+
+            // Date string formats (DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY)
+            if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(strVal) || /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(strVal)) {
+                const parsed = Date.parse(strVal.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1'));
+                return !isNaN(parsed);
+            }
+
+            // Excel Serial Date Numbers (Only valid if header explicitly implies Date and number is in plausible range > 30000 -> 1982+)
+            if (typeof val === 'number' || !isNaN(val)) {
+                const num = Number(val);
+                if (dateHeaderRegex.test(colName) && num > 30000 && num < 60000) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Helper: Parse Excel Serial or String Date to JS Date
+        function parseToJSDate(val) {
+            if (val instanceof Date) return val;
+            if (!val) return null;
+
+            if (typeof val === 'number' || (!isNaN(val) && !String(val).includes('/') && !String(val).includes('-'))) {
+                const num = Number(val);
+                if (num > 30000 && num < 60000) {
+                    return new Date(Math.round((num - 25569) * 86400 * 1000));
+                }
+            }
+
+            const str = String(val).trim();
+            // Format DD/MM/YYYY
+            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
+                const [d, m, y] = str.split('/');
+                return new Date(y, m - 1, d);
+            }
+            // Format YYYY-MM-DD
+            if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(str)) {
+                const [y, m, d] = str.split('-');
+                return new Date(y, m - 1, d);
+            }
+
+            const d = new Date(str);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
+        // Helper: Parse Numeric values (handles string currency, spaces, etc.)
+        function parseNumeric(val) {
+            if (val === null || val === undefined) return null;
+            if (typeof val === 'number') return val;
+            let str = String(val).replace(/R\$/g, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.').trim();
+            let n = parseFloat(str);
+            return isNaN(n) ? null : n;
+        }
+
+        // Setup UI Selectors
+        function setupControls() {
+            // Metric Selector
+            const metricSel = document.getElementById('metricSelector');
+            metricSel.innerHTML = '';
+            if (columnTypes.numeric.length === 0) {
+                metricSel.innerHTML = '<option value="">Nenhuma métrica numárica</option>';
+            } else {
+                columnTypes.numeric.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m;
+                    opt.textContent = m;
+                    if (m === primaryMetric) opt.selected = true;
+                    metricSel.appendChild(opt);
+                });
+            }
+
+            // Dynamic Categorical Filters
+            const filtersContainer = document.getElementById('filtersContainer');
+            filtersContainer.innerHTML = '';
+            const topCategories = columnTypes.categorical.slice(0, 4);
+
+            topCategories.forEach(cat => {
+                const div = document.createElement('div');
+                div.className = 'bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm';
+                
+                const label = document.createElement('label');
+                label.className = 'block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 truncate';
+                label.textContent = cat;
+
+                const select = document.createElement('select');
+                select.className = 'w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs px-2 py-1.5 focus:outline-none focus:border-brand-500';
+                select.setAttribute('data-filter-col', cat);
+                select.onchange = () => {
+                    if (select.value === '__ALL__') delete activeFilters[cat];
+                    else activeFilters[cat] = select.value;
+                    applyFilters();
+                };
+
+                // Get Unique Values
+                const uniqueVals = [...new Set(fullData.map(r => r[cat]))].filter(v => v !== null && v !== undefined).slice(0, 100);
+                select.innerHTML = `<option value="__ALL__">Todos (${uniqueVals.length})</option>`;
+                uniqueVals.sort().forEach(v => {
+                    const opt = document.createElement('option');
+                    opt.value = String(v);
+                    opt.textContent = String(v);
+                    select.appendChild(opt);
+                });
+
+                div.appendChild(label);
+                div.appendChild(select);
+                filtersContainer.appendChild(div);
+            });
+
+            // Ranking & Pivot Dimension Selectors
+            const rankingSel = document.getElementById('rankingDimensionSelector');
+            const pivotSel = document.getElementById('pivotDimensionSelector');
+            rankingSel.innerHTML = '';
+            pivotSel.innerHTML = '';
+
+            columnTypes.categorical.forEach(c => {
+                rankingSel.appendChild(new Option(c, c));
+                pivotSel.appendChild(new Option(c, c));
+            });
+        }
+
+        function handleMetricChange() {
+            primaryMetric = document.getElementById('metricSelector').value;
+            renderDashboard();
+        }
+
+        function clearFilters() {
+            activeFilters = {};
+            document.getElementById('searchInput').value = '';
+            document.querySelectorAll('[data-filter-col]').forEach(s => s.value = '__ALL__');
+            applyFilters();
+        }
+
+        // Apply Search & Dynamic Categorical Filters
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+
+            filteredData = fullData.filter(row => {
+                // Category Filter
+                for (let col in activeFilters) {
+                    if (String(row[col]) !== activeFilters[col]) return false;
+                }
+
+                // Global Search
+                if (searchTerm) {
+                    const match = Object.values(row).some(val => val !== null && String(val).toLowerCase().includes(searchTerm));
+                    if (!match) return false;
+                }
+
+                return true;
+            });
+
+            currentPage = 1;
+            renderDashboard();
+        }
+
+        // Main Rendering Orchestration
+        function renderDashboard() {
+            renderKPIs();
+            renderTemporalChart();
+            renderComparison();
+            renderRanking();
+            renderPivotTable();
+            renderDataTable();
+            renderDiagnostics();
+        }
+
+        // Render Automatic KPIs
+        function renderKPIs() {
+            const container = document.getElementById('kpiContainer');
+            container.innerHTML = '';
+
+            const totalRecords = filteredData.length;
+
+            // KPI 1: Total Records
+            container.appendChild(createKPICard('Total de Registros', totalRecords.toLocaleString('pt-BR'), 'fa-solid fa-database', 'text-blue-500'));
+
+            if (primaryMetric) {
+                const values = filteredData.map(r => parseNumeric(r[primaryMetric])).filter(v => v !== null);
+                const sum = values.reduce((a, b) => a + b, 0);
+                const avg = values.length ? sum / values.length : 0;
+                const max = values.length ? Math.max(...values) : 0;
+
+                // Format values dynamically
+                const isCurrency = /VALOR|RECEITA|FATURAMENTO|TOTAL|PRECO|CUSTO/i.test(primaryMetric);
+                const fmt = (v) => isCurrency ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+
+                container.appendChild(createKPICard(`Soma - ${primaryMetric}`, fmt(sum), 'fa-solid fa-calculator', 'text-emerald-500'));
+                container.appendChild(createKPICard(`Média - ${primaryMetric}`, fmt(avg), 'fa-solid fa-chart-simple', 'text-indigo-500'));
+                container.appendChild(createKPICard(`Máximo - ${primaryMetric}`, fmt(max), 'fa-solid fa-arrow-up-right-dots', 'text-amber-500'));
+            }
+        }
+
+        function createKPICard(title, value, icon, iconColor) {
+            const card = document.createElement('div');
+            card.className = 'bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between';
+            card.innerHTML = `
+                <div class="space-y-1">
+                    <span class="text-xs font-semibold text-slate-400 block truncate max-w-[160px]" title="${title}">${title}</span>
+                    <span class="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">${value}</span>
+                </div>
+                <div class="w-10 h-10 bg-slate-50 dark:bg-slate-700 rounded-lg flex items-center justify-center text-lg ${iconColor}">
+                    <i class="${icon}"></i>
+                </div>
+            `;
+            return card;
+        }
+
+        // Temporal Analysis Logic
+        function setTemporalGroup(group) {
+            currentTemporalGroup = group;
+            ['Day', 'Month', 'Quarter', 'Year'].forEach(g => {
+                const btn = document.getElementById(`btnGrp${g}`);
+                if (g.toLowerCase() === group) {
+                    btn.className = 'px-2.5 py-1 rounded font-medium transition bg-white dark:bg-slate-700 shadow-sm text-brand-600 dark:text-brand-400';
+                } else {
+                    btn.className = 'px-2.5 py-1 rounded font-medium transition text-slate-500 hover:text-slate-700 dark:text-slate-400';
+                }
+            });
+            renderTemporalChart();
+        }
+
+        function renderTemporalChart() {
+            const canvas = document.getElementById('temporalChart');
+            const fallback = document.getElementById('temporalChartFallback');
+            const titleEl = document.getElementById('temporalChartTitle');
+
+            if (!primaryDateCol) {
+                canvas.classList.add('hidden');
+                fallback.classList.remove('hidden');
+                titleEl.innerHTML = `<i class="fa-solid fa-chart-line text-brand-500"></i> Análise Temporal — Nenhuma coluna de data disponível`;
+                return;
+            }
+
+            canvas.classList.remove('hidden');
+            fallback.classList.add('hidden');
+            titleEl.innerHTML = `<i class="fa-solid fa-chart-line text-brand-500"></i> EVOLUÇÃO TEMPORAL DE ${primaryMetric || 'REGISTROS'} — ${primaryDateCol}`;
+
+            // Aggregate Data by Period
+            const aggregated = {};
+            filteredData.forEach(row => {
+                const rawDate = row[primaryDateCol];
+                const jsDate = parseToJSDate(rawDate);
+                if (!jsDate) return;
+
+                let key = '';
+                const y = jsDate.getFullYear();
+                const m = String(jsDate.getMonth() + 1).padStart(2, '0');
+                const d = String(jsDate.getDate()).padStart(2, '0');
+
+                if (currentTemporalGroup === 'day') key = `${y}-${m}-${d}`;
+                else if (currentTemporalGroup === 'month') key = `${y}-${m}`;
+                else if (currentTemporalGroup === 'quarter') {
+                    const q = Math.floor(jsDate.getMonth() / 3) + 1;
+                    key = `${y}-Q${q}`;
+                } else if (currentTemporalGroup === 'year') key = `${y}`;
+
+                const val = primaryMetric ? (parseNumeric(row[primaryMetric]) || 0) : 1;
+                aggregated[key] = (aggregated[key] || 0) + val;
+            });
+
+            const sortedKeys = Object.keys(aggregated).sort();
+            const labels = sortedKeys;
+            const values = sortedKeys.map(k => aggregated[k]);
+
+            if (chartInstance) chartInstance.destroy();
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridColor = isDark ? '#334155' : '#e2e8f0';
+            const textColor = isDark ? '#94a3b8' : '#64748b';
+
+            chartInstance = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: primaryMetric || 'Registros',
+                        data: values,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 3,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } } },
+                        y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        // Period Comparison Section
+        function renderComparison() {
+            const container = document.getElementById('comparisonContent');
+            container.innerHTML = '';
+
+            if (!primaryDateCol || !primaryMetric) {
+                container.innerHTML = `<p class="text-xs text-slate-400">Comparativo indisponível sem datas ou métricas válidas.</p>`;
+                return;
+            }
+
+            // Group by Month for Period Comparison
+            const aggregated = {};
+            filteredData.forEach(row => {
+                const jsDate = parseToJSDate(row[primaryDateCol]);
+                if (!jsDate) return;
+
+                const key = `${jsDate.getFullYear()}-${String(jsDate.getMonth() + 1).padStart(2, '0')}`;
+                const val = parseNumeric(row[primaryMetric]) || 0;
+                aggregated[key] = (aggregated[key] || 0) + val;
+            });
+
+            const sortedKeys = Object.keys(aggregated).sort();
+            if (sortedKeys.length < 2) {
+                container.innerHTML = `<p class="text-xs text-slate-400">Dados insuficientes para comparar períodos (mínimo de 2 períodos necessários).</p>`;
+                return;
+            }
+
+            const currentPeriod = sortedKeys[sortedKeys.length - 1];
+            const previousPeriod = sortedKeys[sortedKeys.length - 2];
+
+            const currentVal = aggregated[currentPeriod];
+            const previousVal = aggregated[previousPeriod];
+
+            const diff = currentVal - previousVal;
+            const pct = previousVal !== 0 ? (diff / previousVal) * 100 : 0;
+
+            const isGrowth = diff >= 0;
+            const badgeClass = isGrowth ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400';
+            const iconClass = isGrowth ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down';
+
+            container.innerHTML = `
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                        <span>Período Atual: <b>${currentPeriod}</b></span>
+                        <span>Anterior: <b>${previousPeriod}</b></span>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                        <div>
+                            <span class="text-xs text-slate-400 block">Valor Atual</span>
+                            <span class="text-base font-bold">${currentVal.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs text-slate-400 block">Valor Anterior</span>
+                            <span class="text-base font-bold text-slate-500">${previousVal.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</span>
+                        </div>
+                    </div>
+
+                    <div class="p-3 rounded-lg ${badgeClass} flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <i class="fa-solid ${iconClass} text-lg"></i>
+                            <div>
+                                <span class="text-xs font-semibold block">${isGrowth ? 'Crescimento' : 'Queda'} Absoluta</span>
+                                <span class="text-sm font-bold">${Math.abs(diff).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs font-semibold block">Variação</span>
+                            <span class="text-sm font-bold">${isGrowth ? '+' : ''}${pct.toFixed(2)}%</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render Ranking Section
+        function renderRanking() {
+            const container = document.getElementById('rankingList');
+            const dim = document.getElementById('rankingDimensionSelector').value;
+            const limit = parseInt(document.getElementById('rankingLimitSelector').value);
+
+            container.innerHTML = '';
+
+            if (!dim) {
+                container.innerHTML = `<p class="text-xs text-slate-400">Nenhuma dimensão categórica disponível.</p>`;
+                return;
+            }
+
+            const aggregated = {};
+            filteredData.forEach(r => {
+                const key = r[dim] !== null && r[dim] !== undefined ? String(r[dim]) : 'N/A';
+                const val = primaryMetric ? (parseNumeric(r[primaryMetric]) || 0) : 1;
+                aggregated[key] = (aggregated[key] || 0) + val;
+            });
+
+            const sorted = Object.entries(aggregated).sort((a, b) => b[1] - a[1]).slice(0, limit);
+            const maxVal = sorted.length ? sorted[0][1] : 1;
+
+            sorted.forEach(([key, val], idx) => {
+                const pct = (val / maxVal) * 100;
+                const row = document.createElement('div');
+                row.className = 'space-y-1';
+                row.innerHTML = `
+                    <div class="flex justify-between text-xs font-medium">
+                        <span class="truncate max-w-[200px]"><b class="text-brand-500 mr-1">#${idx + 1}</b> ${key}</span>
+                        <span>${val.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div class="h-full bg-brand-500 rounded-full" style="width: ${pct}%"></div>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        // Render Pivot Table Section
+        function renderPivotTable() {
+            const tbody = document.getElementById('pivotTableBody');
+            const dim = document.getElementById('pivotDimensionSelector').value;
+            tbody.innerHTML = '';
+
+            if (!dim) return;
+
+            const aggregated = {};
+            filteredData.forEach(r => {
+                const key = r[dim] !== null && r[dim] !== undefined ? String(r[dim]) : 'N/A';
+                const val = primaryMetric ? (parseNumeric(r[primaryMetric]) || 0) : 1;
+
+                if (!aggregated[key]) aggregated[key] = { count: 0, sum: 0 };
+                aggregated[key].count++;
+                aggregated[key].sum += val;
+            });
+
+            Object.entries(aggregated).slice(0, 10).forEach(([key, data]) => {
+                const avg = data.sum / data.count;
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-700/30';
+                tr.innerHTML = `
+                    <td class="py-2 px-3 font-medium truncate max-w-[150px]">${key}</td>
+                    <td class="py-2 px-3 text-right">${data.count}</td>
+                    <td class="py-2 px-3 text-right font-medium">${data.sum.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</td>
+                    <td class="py-2 px-3 text-right text-slate-400">${avg.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Render Data Table with Pagination
+        function renderDataTable() {
+            const thead = document.getElementById('dataTableHead');
+            const tbody = document.getElementById('dataTableBody');
+
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            document.getElementById('tableRecordCount').textContent = `${filteredData.length} registros encontrados`;
+
+            // Table Header
+            const trHead = document.createElement('tr');
+            activeHeaders.forEach(h => {
+                const th = document.createElement('th');
+                th.className = 'py-2.5 px-3 whitespace-nowrap';
+                th.textContent = h.name;
+                trHead.appendChild(th);
+            });
+            thead.appendChild(trHead);
+
+            // Pagination calculation
+            const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+
+            const startIdx = (currentPage - 1) * pageSize;
+            const pageData = filteredData.slice(startIdx, startIdx + pageSize);
+
+            // Table Body
+            pageData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-700/30 transition';
+
+                activeHeaders.forEach(h => {
+                    const td = document.createElement('td');
+                    td.className = 'py-2 px-3 whitespace-nowrap text-slate-600 dark:text-slate-300';
+                    let val = row[h.name];
+
+                    // Formatting Logic
+                    if (val === null || val === undefined) {
+                        td.textContent = '-';
+                        td.className += ' text-slate-300 dark:text-slate-600';
+                    } else if (columnTypes.numeric.includes(h.name)) {
+                        let num = parseNumeric(val);
+                        td.textContent = num !== null ? num.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : val;
+                        td.className += ' font-mono text-right';
+                    } else if (columnTypes.date.includes(h.name)) {
+                        let d = parseToJSDate(val);
+                        td.textContent = d ? d.toLocaleDateString('pt-BR') : val;
+                    } else {
+                        td.textContent = String(val);
+                    }
+
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+
+            // Update Pagination UI
+            document.getElementById('pageIndicator').textContent = `Página ${currentPage} de ${totalPages}`;
+            document.getElementById('btnPrevPage').disabled = currentPage === 1;
+            document.getElementById('btnNextPage').disabled = currentPage === totalPages;
+        }
+
+        function changePage(delta) {
+            currentPage += delta;
+            renderDataTable();
+        }
+
+        function changePageSize() {
+            pageSize = parseInt(document.getElementById('pageSizeSelector').value);
+            currentPage = 1;
+            renderDataTable();
+        }
+
+        // Structure Diagnostics Render
+        function renderDiagnostics() {
+            const container = document.getElementById('diagnosticContent');
+            container.innerHTML = `
+                <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span class="text-slate-400 block mb-0.5">Linhas Válidas</span>
+                    <span class="font-bold text-base text-brand-600 dark:text-brand-400">${fullData.length}</span>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span class="text-slate-400 block mb-0.5">Colunas Reais</span>
+                    <span class="font-bold text-base">${activeHeaders.length}</span>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span class="text-slate-400 block mb-0.5">Métricas Numéricas</span>
+                    <span class="font-bold text-sm truncate block" title="${columnTypes.numeric.join(', ')}">${columnTypes.numeric.length} colunas</span>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span class="text-slate-400 block mb-0.5">Colunas de Data</span>
+                    <span class="font-bold text-sm truncate block" title="${columnTypes.date.join(', ')}">${columnTypes.date.length ? columnTypes.date.join(', ') : 'Nenhuma'}</span>
+                </div>
+            `;
+        }
+
+        // Export Functions
+        function exportExcel() {
+            if (!filteredData.length) return;
+            const ws = XLSX.utils.json_to_sheet(filteredData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Dados Filtrados");
+            XLSX.writeFile(wb, `Export_BI_${currentSheetName}.xlsx`);
+        }
+
+        function exportPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.setFontSize(16);
+            doc.text(`Relatório Executivo BI - ${currentSheetName}`, 14, 15);
+
+            doc.setFontSize(9);
+            doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 22);
+            doc.text(`Total de registros filtrados: ${filteredData.length}`, 14, 27);
+
+            // AutoTable Data Export
+            const headers = activeHeaders.map(h => h.name);
+            const dataRows = filteredData.slice(0, 100).map(row => activeHeaders.map(h => row[h.name] ?? ''));
+
+            doc.autoTable({
+                head: [headers],
+                body: dataRows,
+                startY: 32,
+                styles: { fontSize: 7 },
+                headStyles: { fillColor: [37, 99, 235] }
+            });
+
+            doc.save(`Relatorio_BI_${currentSheetName}.pdf`);
+        }
+    </script>
+</body>
+</html>
